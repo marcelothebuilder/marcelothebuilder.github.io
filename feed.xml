@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title></title>
+    <description>Talking about code</description>
+    <link>blog url//</link>
+    <atom:link href="blog url//feed.xml" rel="self" type="application/rss+xml"/>
+    <pubDate>Sun, 10 Sep 2017 20:27:33 -0300</pubDate>
+    <lastBuildDate>Sun, 10 Sep 2017 20:27:33 -0300</lastBuildDate>
+    <generator>Jekyll v3.5.2</generator>
+    
+      <item>
+        <title>Yet another technology blog</title>
+        <description>&lt;p&gt;My name is Marcelo and I’m a software developer currently living in &lt;a href=&quot;https://en.wikipedia.org/wiki/Uberl%C3%A2ndia&quot; target=&quot;_blank&quot;&gt;Uberlândia, Brazil&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;I’ve been developing software for fun since i was fifteen. A few years later, I realized that programming was something that I already had been doing with a quality that could be used professionally, and then I started working in the industry.&lt;/p&gt;
+
+&lt;p&gt;Throughout the years I had contact with &lt;strong&gt;Perl&lt;/strong&gt;, &lt;strong&gt;C#&lt;/strong&gt;, &lt;strong&gt;C++&lt;/strong&gt;, &lt;strong&gt;Java&lt;/strong&gt; and &lt;strong&gt;Javascript&lt;/strong&gt; (Client &amp;amp; Server-side). Today I work heavily with &lt;strong&gt;Java&lt;/strong&gt; and &lt;strong&gt;Javascript&lt;/strong&gt; enterprisely. Currently I’m anxious to have some fun with Typescript (Angular) and Kotlin.&lt;/p&gt;
+
+&lt;p&gt;I’ve been flirting with the idea of creating a blog for too long, but time had been crushing my dreams. I hope this introduction to be just the front page to a lot of useful and interesting posts.&lt;/p&gt;
+</description>
+        <pubDate>Sun, 10 Sep 2017 17:00:00 -0300</pubDate>
+        <link>blog url//2017/09/10/yet-another-technology-blog.html</link>
+        <guid isPermaLink="true">blog url//2017/09/10/yet-another-technology-blog.html</guid>
+        
+        
+      </item>
+    
+  </channel>
+</rss>
