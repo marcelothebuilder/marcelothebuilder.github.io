@@ -3,10 +3,10 @@
   <channel>
     <title>Marcelo Paixão Resende</title>
     <description>Talking about code</description>
-    <link>blog url//</link>
-    <atom:link href="blog url//feed.xml" rel="self" type="application/rss+xml"/>
-    <pubDate>Sun, 21 Jan 2018 21:29:32 -0200</pubDate>
-    <lastBuildDate>Sun, 21 Jan 2018 21:29:32 -0200</lastBuildDate>
+    <link>https://marcelothebuilder.github.io//</link>
+    <atom:link href="https://marcelothebuilder.github.io//feed.xml" rel="self" type="application/rss+xml"/>
+    <pubDate>Sun, 21 Jan 2018 21:32:22 -0200</pubDate>
+    <lastBuildDate>Sun, 21 Jan 2018 21:32:22 -0200</lastBuildDate>
     <generator>Jekyll v3.5.2</generator>
     
       <item>
@@ -189,8 +189,8 @@ Caused by: org.postgresql.util.PSQLException: ERROR: syntax error at or near &qu
 &lt;p&gt;Which one to choose is up to you!&lt;/p&gt;
 </description>
         <pubDate>Sun, 10 Sep 2017 22:12:00 -0300</pubDate>
-        <link>blog url//java/jpa/2017/09/11/jpa-post.html</link>
-        <guid isPermaLink="true">blog url//java/jpa/2017/09/11/jpa-post.html</guid>
+        <link>https://marcelothebuilder.github.io//java/jpa/2017/09/11/jpa-post.html</link>
+        <guid isPermaLink="true">https://marcelothebuilder.github.io//java/jpa/2017/09/11/jpa-post.html</guid>
         
         
         <category>Java</category>
@@ -210,8 +210,8 @@ Caused by: org.postgresql.util.PSQLException: ERROR: syntax error at or near &qu
 &lt;p&gt;I’ve been flirting with the idea of creating a blog for too long, but time had been crushing my dreams. I hope this introduction to be just the front page to a lot of useful and interesting posts.&lt;/p&gt;
 </description>
         <pubDate>Sun, 10 Sep 2017 17:00:00 -0300</pubDate>
-        <link>blog url//2017/09/10/yet-another-technology-blog.html</link>
-        <guid isPermaLink="true">blog url//2017/09/10/yet-another-technology-blog.html</guid>
+        <link>https://marcelothebuilder.github.io//2017/09/10/yet-another-technology-blog.html</link>
+        <guid isPermaLink="true">https://marcelothebuilder.github.io//2017/09/10/yet-another-technology-blog.html</guid>
         
         
       </item>
