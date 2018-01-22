@@ -139,6 +139,229 @@
 
     <article class="post">
         <header class="post-header">
+            <h2 class="post-title"><a href="/elasticsearch/nosql/2018/01/21/ElasticSearch-Pagination-by-document-creation-date.html">ElasticSearch: Pagination by document creation date</a></h2>
+        </header>
+        <section class="post-content">
+          <!-- <p>It’s been a while. Kept you waiting, huh?</p>
+
+<p>Pagination is not an easy task. There are a lot of implementations that are simply wrong, returning pages missing entries when there’s insertion/updates between queries or sufferring from serious performance issues.</p>
+
+<p>With ElasticSearch, we have multiple ways of implementing pagination. The <a href="https://www.elastic.co/guide/en/elasticsearch/reference/5.5/search-request-scroll.html">Scroll API</a> is a good feature when you need to fetch multiple documents inside a task, but it won’t save you when you need to work with pages in a stateless manner (maybe there’s a front-end client consuming your api).</p>
+
+<p>Real case: I needed to search for documents using a task that would run every N minutes. At the end of every search, I would save a “checkpoint”, something indicating where I last stopped so that the next iteration could resume from it.</p>
+
+<h2 id="pagination-with-a-creation-date-field">Pagination with a “creation date” field</h2>
+
+<p>Supposing we have the following documents stored in an index:</p>
+
+<figure class="highlight"><pre><code class="language-json" data-lang="json"><span></span><span class="p">[</span>
+  <span class="p">{</span>
+    <span class="nt">&quot;creationDate&quot;</span><span class="p">:</span> <span class="s2">&quot;2018-01-21T19:51:42.840Z&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Marcelo&quot;</span>
+  <span class="p">},</span>
+  <span class="p">{</span>
+    <span class="nt">&quot;creationDate&quot;</span><span class="p">:</span> <span class="s2">&quot;2018-01-21T19:51:42.840Z&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Sarah&quot;</span>
+  <span class="p">},</span>
+  <span class="p">{</span>
+    <span class="nt">&quot;creationDate&quot;</span><span class="p">:</span> <span class="s2">&quot;2018-01-21T19:51:42.840Z&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Yasmin&quot;</span>
+  <span class="p">},</span>
+  <span class="p">{</span>
+    <span class="nt">&quot;creationDate&quot;</span><span class="p">:</span> <span class="s2">&quot;2018-01-21T20:51:42.840Z&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Julia&quot;</span>
+  <span class="p">},</span>
+  <span class="p">{</span>
+    <span class="nt">&quot;creationDate&quot;</span><span class="p">:</span> <span class="s2">&quot;2018-01-21T20:51:42.840Z&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Nicolly&quot;</span>
+  <span class="p">}</span>
+<span class="p">]</span></code></pre></figure>
+
+<p>In our example, we will search through these documents with a page size of <strong>2</strong>. We want to find all those <strong>5</strong> documents, ordered by their creation date, meaning that when new documents are inserted we can fetch only the new ones.</p>
+
+<h3 id="episode-1-the-naïve-approach">Episode 1: The naïve approach</h3>
+
+<p>We can structure our query in a way that documents are ordered by their <code>creationDate</code> and for every iteration we would store the <strong>last</strong> document <code>creationDate</code>. This is what our query will look like (with the GET /my_index/_search ommitted):</p>
+
+<figure class="highlight"><pre><code class="language-json" data-lang="json"><span></span><span class="p">{</span>
+  <span class="nt">&quot;size&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+  <span class="nt">&quot;query&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;range&quot;</span><span class="p">:</span> <span class="p">{</span>
+      <span class="nt">&quot;_name&quot;</span><span class="p">:</span> <span class="s2">&quot;This block won&#39;t be present in the first page request (since we don&#39;t have the last creationDate reference!)&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;creationDate&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&quot;gt&quot;</span><span class="p">:</span> <span class="s2">&quot;2018-01-21T19:51:42.840Z&quot;</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">},</span>
+  <span class="nt">&quot;sort&quot;</span><span class="p">:</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;creationDate&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&quot;order&quot;</span><span class="p">:</span> <span class="s2">&quot;asc&quot;</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">}</span></code></pre></figure>
+
+<p>And this is the result after 3 iterations/pages (only _source included, the other metadata is not needed for now):</p>
+
+<figure class="highlight"><pre><code class="language-json" data-lang="json"><span></span><span class="p">[{</span>
+  <span class="nt">&quot;_source&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;creationDate&quot;</span><span class="p">:</span> <span class="s2">&quot;2018-01-21T19:51:42.840Z&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Sarah&quot;</span>
+  <span class="p">}</span>
+<span class="p">},</span> <span class="p">{</span>
+  <span class="nt">&quot;_source&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;creationDate&quot;</span><span class="p">:</span> <span class="s2">&quot;2018-01-21T19:51:42.840Z&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Marcelo&quot;</span>
+  <span class="p">}</span>
+<span class="p">},</span> <span class="p">{</span>
+  <span class="nt">&quot;_source&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;creationDate&quot;</span><span class="p">:</span> <span class="s2">&quot;2018-01-21T20:51:42.840Z&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Julia&quot;</span>
+  <span class="p">}</span>
+<span class="p">},</span> <span class="p">{</span>
+  <span class="nt">&quot;_source&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;creationDate&quot;</span><span class="p">:</span> <span class="s2">&quot;2018-01-21T20:51:42.840Z&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Nicolly&quot;</span>
+  <span class="p">}</span>
+<span class="p">}]</span></code></pre></figure>
+
+<p>We only got 4 results!</p>
+
+<p>Where is <strong>Yasmin</strong>?</p>
+
+<p>Turns out that after we got <strong>Sarah</strong> and <strong>Marcelo</strong>, our next query asked for a page with 2 results returning documents created after the first query’s last document (<strong>Marcelo</strong>) with a <code>creationDate</code> greater than “2018-01-21T19:51:42.840Z”.</p>
+
+<p>The problem: Yasmin was also created in that same instant.</p>
+
+<p><strong>Documents created in the same instant makes this approach unpredictable and not always accurate.</strong></p>
+
+<p><strong>Worse yet:</strong> The problem can persist for a long time before someone notice it, if they ever do.</p>
+
+<h3 id="episode-2-the-right-approach">Episode 2: The right approach</h3>
+
+<p>Starting with version 5.0, ElasticSearch provides us a nice and realiable way to address this issue: the <a href="https://www.elastic.co/guide/en/elasticsearch/reference/5.0/search-request-search-after.html">Search After</a> parameter. Quoting the docs:</p>
+
+<blockquote>
+  <p>The search_after parameter circumvents this problem by providing a live cursor. The idea is to use the results from the previous page to help the retrieval of the next page.</p>
+</blockquote>
+
+<p>and</p>
+
+<blockquote>
+  <p>search_after is not a solution to jump freely to a random page but rather to scroll many queries in parallel. It is very similar to the scroll API but unlike it, the search_after parameter is stateless, it is always resolved against the latest version of the searcher.</p>
+</blockquote>
+
+<p>We can change the sort in out last query to include the <a href="https://www.elastic.co/guide/en/elasticsearch/reference/5.0/mapping-uid-field.html">_uid</a> field, unique to every document in that specific index.</p>
+
+<p>Then, starting from the first query, we must include a search_after parameter that will include the <strong>creationDate</strong> and <strong>_uid</strong> from the last document in the previous query. Those values are returned with every match in the <code>sort</code> block:</p>
+
+<figure class="highlight"><pre><code class="language-json" data-lang="json"><span></span><span class="p">{</span>
+  <span class="nt">&quot;_source&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;creationDate&quot;</span><span class="p">:</span> <span class="s2">&quot;2018-01-21T20:51:42.840Z&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Julia&quot;</span>
+  <span class="p">},</span>
+  <span class="nt">&quot;sort&quot;</span><span class="p">:</span> <span class="p">[</span>
+    <span class="mi">1516564302840</span><span class="p">,</span>
+    <span class="s2">&quot;type#AWEagzSzwHnysW-7Ulq9&quot;</span>
+  <span class="p">]</span>
+<span class="p">}</span></code></pre></figure>
+
+<p>So, when finding all documents created after <strong>Julia</strong>, we would use the following query:</p>
+
+<figure class="highlight"><pre><code class="language-json" data-lang="json"><span></span><span class="p">{</span>
+  <span class="nt">&quot;size&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+  <span class="nt">&quot;search_after&quot;</span><span class="p">:</span> <span class="p">[</span>
+    <span class="mi">1516564302840</span><span class="p">,</span>
+    <span class="s2">&quot;type#AWEagzSzwHnysW-7Ulq9&quot;</span>
+  <span class="p">],</span>
+  <span class="nt">&quot;sort&quot;</span><span class="p">:</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;creationDate&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&quot;order&quot;</span><span class="p">:</span> <span class="s2">&quot;asc&quot;</span>
+      <span class="p">}</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;_uid&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&quot;order&quot;</span><span class="p">:</span> <span class="s2">&quot;asc&quot;</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">}</span></code></pre></figure>
+
+<p><strong>That way we can assure that we can find all the current 5 documents and all future documents that will be inserted.</strong></p>
+
+<p>There’s just one caveat: Our application <strong>must not</strong> insert documents with a <code>creationDate</code> lower than the last one.</p>
+
+<h2 id="other-dbms">Other DBMS</h2>
+
+<p>This solution can also be “ported” to other DBMS easily.</p>
+
+<p>For example, I found that solution when looking for a similar way that we used to do with <a href="https://couchdb.apache.org/">CouchDB</a> keys and views.</p>
+
+<p>In this case, it is almost identical.</p>
+
+<p>It would look like this with SQL databases when you are not using an auto-incremented primary key:</p>
+
+<p>First page query:</p>
+
+<figure class="highlight"><pre><code class="language-sql" data-lang="sql"><span></span><span class="k">select</span>
+	<span class="n">uuid</span><span class="p">,</span>
+	<span class="n">creation_date</span>
+<span class="k">from</span>
+	<span class="n">your_table</span>
+<span class="k">order</span> <span class="k">by</span>
+	<span class="n">creation_date</span> <span class="k">asc</span><span class="p">,</span>
+	<span class="n">uuid</span> <span class="k">asc</span>
+<span class="k">limit</span> <span class="mi">10</span></code></pre></figure>
+
+<p>Second page query:</p>
+
+<figure class="highlight"><pre><code class="language-sql" data-lang="sql"><span></span><span class="k">select</span>
+	<span class="n">uuid</span><span class="p">,</span>
+	<span class="n">creation_date</span>
+<span class="k">from</span>
+	<span class="n">your_table</span>
+<span class="k">where</span>
+  <span class="c1">-- the document is indeed created later than the last one</span>
+	<span class="n">creation_date</span> <span class="o">&gt;</span> <span class="p">:</span><span class="n">last_page_row_creation_date</span>
+  <span class="c1">-- OR it was created at the same time, but wasn&#39;t included in the last page because of it&#39;s limit clause</span>
+		<span class="k">or</span> <span class="n">creation_date</span> <span class="o">=</span> <span class="p">:</span><span class="n">last_page_row_creation_date</span> <span class="k">and</span> <span class="n">uuid</span> <span class="o">&gt;</span> <span class="p">:</span><span class="n">last_page_row_uuid</span>
+<span class="k">order</span> <span class="k">by</span>
+	<span class="n">creation_date</span> <span class="k">asc</span><span class="p">,</span>
+	<span class="n">uuid</span> <span class="k">asc</span>
+<span class="k">limit</span> <span class="mi">10</span></code></pre></figure>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>This is a safe way of implementing pagination using ElasticSearch when we plan to iterate through the results in a stateless manner. It is much valuable when using ElasticSearch with endlessy running tasks or when it is used as your primary database.</p>
+
+<p>Good luck!</p>
+ -->
+          <!-- <section class="post-excerpt"> -->
+          <!--excerpt disabled -->
+            <p>It’s been a while. Kept you waiting, huh?</p>
+
+ <a class="read-more" href="/elasticsearch/nosql/2018/01/21/ElasticSearch-Pagination-by-document-creation-date.html">Read more &raquo;</a>
+        </section>
+        <footer class="post-meta">
+            
+                <img class="author-thumb" src="/assets/images/profile.png" alt="Author's profile picture" nopin="nopin" />
+                Marcelo Paixão Resende
+            
+            
+                on ElasticSearch and NoSQL
+            
+            <time class="post-date" datetime="2018-01-21">
+                21 Jan 2018
+            </time>
+        </footer>
+    </article>
+
+    
+
+    <article class="post">
+        <header class="post-header">
             <h2 class="post-title"><a href="/java/jpa/2017/09/11/jpa-post.html">JPA Criteria: Invalid SQL with IN predicate</a></h2>
         </header>
         <section class="post-content">
